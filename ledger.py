@@ -8,11 +8,19 @@ st.set_page_config(page_title="Simple Ledger", layout="wide")
 # Database setup
 DB_FILE = "ledger.db"
 
+
+def connect():
+    """Return a SQLite connection with foreign keys enabled."""
+    conn = sqlite3.connect(DB_FILE)
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
+
+
 def init_database():
     """Initialize the SQLite database with required tables."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = connect()
     cursor = conn.cursor()
-    
+
     # Create accounts table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS accounts (
@@ -20,7 +28,7 @@ def init_database():
             name TEXT UNIQUE NOT NULL
         )
     ''')
-    
+
     # Create items table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS items (
@@ -28,25 +36,25 @@ def init_database():
             account TEXT NOT NULL,
             description TEXT NOT NULL,
             price REAL NOT NULL,
-            FOREIGN KEY (account) REFERENCES accounts (name)
+            FOREIGN KEY (account) REFERENCES accounts (name) ON DELETE CASCADE
         )
     ''')
-    
+
     conn.commit()
     conn.close()
 
+
 def load_accounts() -> List[str]:
-    """Load accounts from database."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = connect()
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM accounts ORDER BY name")
     accounts = [row[0] for row in cursor.fetchall()]
     conn.close()
     return accounts
 
+
 def load_items() -> List[Dict[str, Any]]:
-    """Load items from database."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = connect()
     cursor = conn.cursor()
     cursor.execute("SELECT id, account, description, price FROM items ORDER BY id")
     items = []
@@ -60,9 +68,9 @@ def load_items() -> List[Dict[str, Any]]:
     conn.close()
     return items
 
+
 def save_account(name: str):
-    """Save account to database."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = connect()
     cursor = conn.cursor()
     try:
         cursor.execute("INSERT INTO accounts (name) VALUES (?)", (name,))
@@ -71,86 +79,94 @@ def save_account(name: str):
         pass  # Account already exists
     conn.close()
 
+
 def remove_account(name: str):
-    """Remove account and its items from database."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = connect()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM items WHERE account = ?", (name,))
     cursor.execute("DELETE FROM accounts WHERE name = ?", (name,))
     conn.commit()
     conn.close()
 
+
 def update_account_name(old_name: str, new_name: str):
-    """Update account name in database."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = connect()
     cursor = conn.cursor()
     cursor.execute("UPDATE accounts SET name = ? WHERE name = ?", (new_name, old_name))
     cursor.execute("UPDATE items SET account = ? WHERE account = ?", (new_name, old_name))
     conn.commit()
     conn.close()
 
+
 def save_item(account: str, description: str, price: float) -> int:
-    """Save item to database and return its ID."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = connect()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO items (account, description, price) VALUES (?, ?, ?)", 
-                   (account, description, price))
+    cursor.execute(
+        "INSERT INTO items (account, description, price) VALUES (?, ?, ?)",
+        (account, description, price)
+    )
     item_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return item_id
 
+
 def remove_item(item_id: int):
-    """Remove item from database."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = connect()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM items WHERE id = ?", (item_id,))
     conn.commit()
     conn.close()
 
+
 def update_item(item_id: int, description: str, price: float, account: str):
-    """Update item in database."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = connect()
     cursor = conn.cursor()
-    cursor.execute("UPDATE items SET description = ?, price = ?, account = ? WHERE id = ?", 
-                   (description, price, account, item_id))
+    cursor.execute(
+        "UPDATE items SET description = ?, price = ?, account = ? WHERE id = ?",
+        (description, price, account, item_id)
+    )
     conn.commit()
     conn.close()
+
 
 # Initialize database
 init_database()
 
 # Initialize session state
 if "accounts" not in st.session_state:
-    st.session_state.accounts: List[str] = load_accounts()
+    st.session_state["accounts"]: List[str] = load_accounts()
 if "items" not in st.session_state:
-    st.session_state.items: List[Dict[str, Any]] = load_items()
+    st.session_state["items"]: List[Dict[str, Any]] = load_items()
+
 
 def add_account(name: str):
     name = name.strip()
-    if name and name not in st.session_state.accounts:
-        st.session_state.accounts.append(name)
+    if name and name not in st.session_state["accounts"]:
+        st.session_state["accounts"].append(name)
         save_account(name)
 
+
 def delete_account(name: str):
-    # Remove account and any items belonging to it
-    st.session_state.accounts = [c for c in st.session_state.accounts if c != name]
-    st.session_state.items = [it for it in st.session_state.items if it["account"] != name]
+    st.session_state["accounts"] = [c for c in st.session_state["accounts"] if c != name]
+    st.session_state["items"] = [it for it in st.session_state["items"] if it["account"] != name]
     remove_account(name)
+
 
 def rename_account(old: str, new: str):
     new = new.strip()
-    if not new or (new != old and new in st.session_state.accounts):
+    if not new or (new != old and new in st.session_state["accounts"]):
         return
-    idx = st.session_state.accounts.index(old)
-    st.session_state.accounts[idx] = new
-    for it in st.session_state.items:
+    idx = st.session_state["accounts"].index(old)
+    st.session_state["accounts"][idx] = new
+    for it in st.session_state["items"]:
         if it["account"] == old:
             it["account"] = new
     update_account_name(old, new)
 
+
 def add_item(account: str, description: str, price: float):
-    if not account or account not in st.session_state.accounts:
+    if not account or account not in st.session_state["accounts"]:
         st.warning("Select or create an account first.")
         return
     description = description.strip()
@@ -158,19 +174,21 @@ def add_item(account: str, description: str, price: float):
         st.warning("Description cannot be empty.")
         return
     item_id = save_item(account, description, price)
-    st.session_state.items.append({
+    st.session_state["items"].append({
         "id": item_id,
         "account": account,
         "description": description,
         "price": float(price),
     })
 
+
 def delete_item(item_id: int):
-    st.session_state.items = [it for it in st.session_state.items if it["id"] != item_id]
+    st.session_state["items"] = [it for it in st.session_state["items"] if it["id"] != item_id]
     remove_item(item_id)
 
+
 def edit_item(item_id: int, new_desc: str, new_price: float, new_acc: str):
-    for it in st.session_state.items:
+    for it in st.session_state["items"]:
         if it["id"] == item_id:
             it["description"] = new_desc.strip()
             it["price"] = float(new_price)
@@ -178,8 +196,10 @@ def edit_item(item_id: int, new_desc: str, new_price: float, new_acc: str):
             break
     update_item(item_id, new_desc.strip(), new_price, new_acc)
 
+
 def currency(v: float) -> str:
     return f"$ {v:,.2f}"
+
 
 st.title("Simple Ledger")
 
@@ -190,11 +210,11 @@ with st.sidebar.expander("Add account", expanded=True):
     new_acc = st.text_input("Name", key="new_acc_input")
     if st.button("Add", use_container_width=True):
         add_account(new_acc)
-        st.session_state.new_acc_input = ""
+        st.session_state["new_acc_input"] = ""
 
-if st.session_state.accounts:
+if st.session_state["accounts"]:
     st.sidebar.write("Existing accounts")
-    for acc in st.session_state.accounts:
+    for acc in st.session_state["accounts"]:
         cols = st.sidebar.columns([1, 1, 1.2, 1])
         cols[0].markdown(f"**{acc}**")
 
@@ -207,7 +227,7 @@ if st.session_state.accounts:
                 st.rerun()
         if st.session_state.get(f"renaming_{acc}"):
             new_name = st.text_input(f"New name for '{acc}'", key=f"new_name_{acc}")
-            cols2 = st.sidebar.columns([1,1])
+            cols2 = st.sidebar.columns([1, 1])
             with cols2[0]:
                 if st.button("Save", key=f"save_{acc}"):
                     rename_account(acc, new_name)
@@ -221,7 +241,7 @@ if st.session_state.accounts:
 st.subheader("Add item")
 col_acc, col_desc, col_price, col_add = st.columns([1.2, 3, 1, 1])
 with col_acc:
-    acc_choice = st.selectbox("Account", options=[""] + st.session_state.accounts, index=0, help="Choose an account")
+    acc_choice = st.selectbox("Account", options=[""] + st.session_state["accounts"], index=0, help="Choose an account")
 with col_desc:
     desc = st.text_input("Description")
 with col_price:
@@ -235,14 +255,14 @@ with col_add:
 st.divider()
 
 # Filters
-left, right = st.columns([2,1])
+left, right = st.columns([2, 1])
 with left:
-    selected_acc = st.selectbox("Filter by account", options=["All"] + st.session_state.accounts, index=0)
+    selected_acc = st.selectbox("Filter by account", options=["All"] + st.session_state["accounts"], index=0)
 with right:
     show_totals = st.checkbox("Show totals", value=True)
 
 # Filter items
-all_items = st.session_state.items
+all_items = st.session_state["items"]
 if selected_acc != "All":
     filtered_items = [it for it in all_items if it["account"] == selected_acc]
 else:
@@ -266,8 +286,10 @@ else:
 
         if st.session_state.get(f"editing_{it['id']}", False):
             new_desc = cols[1].text_input("Desc", value=it["description"], key=f"desc_{it['id']}")
-            new_price = cols[2].number_input("Price", min_value=0.0, step=0.01, format="%.2f", value=float(it["price"]), key=f"price_{it['id']}")
-            new_acc = cols[3].selectbox("Account", options=st.session_state.accounts, index=st.session_state.accounts.index(it["account"]), key=f"acc_{it['id']}")
+            new_price = cols[2].number_input("Price", min_value=0.0, step=0.01, format="%.2f", value=float(it["price"]),
+                                             key=f"price_{it['id']}")
+            new_acc = cols[3].selectbox("Account", options=st.session_state["accounts"],
+                                        index=st.session_state["accounts"].index(it["account"]), key=f"acc_{it['id']}")
             with cols[4]:
                 if st.button("Save", key=f"save_item_{it['id']}"):
                     edit_item(it["id"], new_desc, new_price, new_acc)
@@ -288,13 +310,13 @@ else:
                     st.rerun()
 
 # Totals
-if show_totals and st.session_state.items:
+if show_totals and st.session_state["items"]:
     st.divider()
     st.subheader("Totals")
     by_acc = {}
-    for it in st.session_state.items:
+    for it in st.session_state["items"]:
         by_acc[it["account"]] = by_acc.get(it["account"], 0.0) + float(it["price"])
-    total_cols = st.columns([1,1,1,1,1,1])
+    total_cols = st.columns([1, 1, 1, 1, 1, 1])
     i = 0
     for acc, val in sorted(by_acc.items()):
         total_cols[i % 6].metric(acc, currency(val))
