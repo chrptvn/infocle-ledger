@@ -1,0 +1,39 @@
+# Simple Ledger Application Dependencies
+
+# Core Dependencies (Required)
+# These are built-in Python modules, no installation needed:
+# - tkinter (GUI framework)
+# - sqlite3 (database)
+# - os, shutil, datetime (file operations and utilities)
+# - logging (logging functionality)
+
+# Optional Dependencies for Enhanced Functionality
+
+# PDF Text Extraction
+PyPDF2>=3.0.0
+# Alternative PDF library (fallback)
+pdfplumber>=0.9.0
+
+# Image OCR (Optical Character Recognition)
+pytesseract>=0.3.10
+Pillow>=9.0.0
+
+# Installation Instructions:
+# 
+# For basic functionality (without text extraction):
+# No additional packages needed - uses only Python standard library
+#
+# For PDF text extraction:
+# pip install PyPDF2 pdfplumber
+#
+# For image OCR text extraction:
+# pip install pytesseract Pillow
+# Note: pytesseract also requires Tesseract OCR engine to be installed on your system
+# 
+# For full functionality:
+# pip install -r requirements.txt
+#
+# System Requirements for OCR:
+# - Windows: Download and install Tesseract from https://github.com/UB-Mannheim/tesseract/wiki
+# - macOS: brew install tesseract
+# - Linux: sudo apt-get install tesseract-ocr
