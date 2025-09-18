@@ -4,6 +4,8 @@ from typing import List, Callable, Optional
 from models import Item
 from file_manager import FileManager
 from datetime import datetime
+from file_manager import FileManager
+from datetime import datetime
 
 class AccountListWidget:
     """Widget for managing the list of accounts."""
@@ -115,6 +117,9 @@ class ItemEntryWidget:
         self.price_var = None
         self.account_combo = None
         
+        # File manager for importing bills
+        self.file_manager = FileManager()
+        
     def create(self) -> ttk.Frame:
         """Create and return the item entry frame."""
         self.frame = ttk.LabelFrame(self.parent, text="Add Item", padding="10")
@@ -141,11 +146,19 @@ class ItemEntryWidget:
         price_entry.grid(row=5, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
         price_entry.bind('<Return>', lambda e: self._add_item())
         
-        # Add button
-        ttk.Button(self.frame, text="Add Item", command=self._add_item).grid(
-            row=6, column=0, sticky=(tk.W, tk.E)
+        # Buttons frame
+        btn_frame = ttk.Frame(self.frame)
+        btn_frame.grid(row=6, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
+        
+        ttk.Button(btn_frame, text="Add Item", command=self._add_item).grid(
+            row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5)
+        )
+        ttk.Button(btn_frame, text="Import Bill", command=self._import_bill).grid(
+            row=0, column=1, sticky=(tk.W, tk.E)
         )
         
+        btn_frame.columnconfigure(0, weight=1)
+        btn_frame.columnconfigure(1, weight=1)
         self.frame.columnconfigure(0, weight=1)
         
         return self.frame
@@ -174,6 +187,23 @@ class ItemEntryWidget:
             self.on_add(account, description, price)
         except ValueError:
             pass  # Invalid price, ignore
+    
+    def _import_bill(self):
+        """Handle importing a bill file."""
+        imported_path = self.file_manager.select_and_import_file()
+        if imported_path:
+            # Auto-fill description with the filename if empty
+            if not self.description_var.get().strip():
+                import os
+                filename = os.path.basename(imported_path)
+                self.description_var.set(f"Bill: {filename}")
+            
+            # Focus on price field for easy completion
+            # Find the price entry widget and focus it
+            for child in self.frame.winfo_children():
+                if isinstance(child, ttk.Entry) and child['textvariable'] == str(self.price_var):
+                    child.focus()
+                    break
 
 class ItemsDisplayWidget:
     """Widget for displaying and managing items."""
