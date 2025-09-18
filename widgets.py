@@ -151,14 +151,9 @@ class ItemEntryWidget:
         btn_frame.grid(row=6, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
         
         ttk.Button(btn_frame, text="Add Item", command=self._add_item).grid(
-            row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5)
-        )
-        ttk.Button(btn_frame, text="Import Bill", command=self._import_bill).grid(
-            row=0, column=1, sticky=(tk.W, tk.E)
+            row=0, column=0, sticky=(tk.W, tk.E)
         )
         
-        btn_frame.columnconfigure(0, weight=1)
-        btn_frame.columnconfigure(1, weight=1)
         self.frame.columnconfigure(0, weight=1)
         
         return self.frame
@@ -187,23 +182,6 @@ class ItemEntryWidget:
             self.on_add(account, description, price)
         except ValueError:
             pass  # Invalid price, ignore
-    
-    def _import_bill(self):
-        """Handle importing a bill file."""
-        imported_path = self.file_manager.select_and_import_file()
-        if imported_path:
-            # Auto-fill description with the filename if empty
-            if not self.description_var.get().strip():
-                import os
-                filename = os.path.basename(imported_path)
-                self.description_var.set(f"Bill: {filename}")
-            
-            # Focus on price field for easy completion
-            # Find the price entry widget and focus it
-            for child in self.frame.winfo_children():
-                if isinstance(child, ttk.Entry) and child['textvariable'] == str(self.price_var):
-                    child.focus()
-                    break
 
 class ItemsDisplayWidget:
     """Widget for displaying and managing items."""
