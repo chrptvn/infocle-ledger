@@ -1,9 +1,7 @@
-
 import streamlit as st
 import sqlite3
 import os
 from typing import List, Dict, Any
-from itertools import count
 
 st.set_page_config(page_title="Simple Ledger", layout="wide")
 
@@ -206,7 +204,7 @@ if st.session_state.accounts:
         with cols[3]:
             if st.button("Delete", key=f"del_{acc}"):
                 delete_account(acc)
-                st.experimental_rerun()
+                st.rerun()
         if st.session_state.get(f"renaming_{acc}"):
             new_name = st.text_input(f"New name for '{acc}'", key=f"new_name_{acc}")
             cols2 = st.sidebar.columns([1,1])
@@ -214,7 +212,7 @@ if st.session_state.accounts:
                 if st.button("Save", key=f"save_{acc}"):
                     rename_account(acc, new_name)
                     st.session_state[f"renaming_{acc}"] = False
-                    st.experimental_rerun()
+                    st.rerun()
             with cols2[1]:
                 if st.button("Cancel", key=f"cancel_{acc}"):
                     st.session_state[f"renaming_{acc}"] = False
@@ -287,7 +285,7 @@ else:
                     st.session_state[f"editing_{it['id']}"] = True
                 if st.button("Delete", key=del_key):
                     delete_item(it["id"])
-                    st.experimental_rerun()
+                    st.rerun()
 
 # Totals
 if show_totals and st.session_state.items:
