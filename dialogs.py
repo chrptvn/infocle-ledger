@@ -108,7 +108,7 @@ class EditItemDialog:
     
     def _import_bill(self):
         """Import a bill file for this item."""
-        imported_path = self.file_manager.select_and_import_file()
+        imported_path = self.file_manager.select_and_import_file(parent_widget=self.dialog)
         if imported_path:
             # Update the description to include reference to the imported file
             filename = os.path.basename(imported_path)

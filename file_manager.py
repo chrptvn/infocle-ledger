@@ -3,12 +3,19 @@ import shutil
 from datetime import datetime
 from typing import Optional
 from tkinter import filedialog, messagebox
+from text_extractor import TextExtractor, show_extracted_text_dialog
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class FileManager:
     """Manages file operations for bill imports."""
     
     def __init__(self, base_data_dir: str = "data"):
         self.base_data_dir = base_data_dir
+        self.text_extractor = TextExtractor()
         
     def get_date_directory(self, date: datetime = None) -> str:
         """Get the directory path for a specific date."""
@@ -24,17 +31,47 @@ class FileManager:
         os.makedirs(date_dir, exist_ok=True)
         return date_dir
     
-    def import_file(self, source_path: str, date: datetime = None) -> Optional[str]:
+    def import_file(self, source_path: str, date: datetime = None, parent_widget=None) -> Optional[str]:
         """
-        Import a file to the appropriate date directory.
+        Import a file to the appropriate date directory with text extraction.
         Returns the new file path if successful, None otherwise.
         """
         try:
+            filename = os.path.basename(source_path)
+            
+            # Step 1: Extract text from the bill
+            if self.text_extractor.can_extract(source_path):
+                success, extracted_text = self.text_extractor.extract_text(source_path)
+                
+                if success and extracted_text:
+                    # Step 2: Display popup with extracted text
+                    # Step 3: Log the text in console
+                    logger.info(f"=== EXTRACTED TEXT FROM {filename} ===")
+                    logger.info(extracted_text)
+                    logger.info(f"=== END OF EXTRACTED TEXT ===")
+                    
+                    # Show dialog and wait for user confirmation
+                    if parent_widget:
+                        user_confirmed = show_extracted_text_dialog(parent_widget, extracted_text, filename)
+                        if not user_confirmed:
+                            return None  # User cancelled
+                    else:
+                        # Fallback to simple messagebox if no parent widget
+                        messagebox.showinfo("Bill Parsed", f"✅ Bill has been successfully parsed!\n\nExtracted text logged to console.")
+                else:
+                    # Text extraction failed, but continue with import
+                    logger.warning(f"Failed to extract text from {filename}: {extracted_text}")
+                    if parent_widget:
+                        messagebox.showwarning("Text Extraction Failed", 
+                                             f"Could not extract text from the bill:\n{extracted_text}\n\nFile will still be imported.")
+            else:
+                logger.info(f"File type not supported for text extraction: {filename}")
+            
+            # Step 4: Move the file to the directory (after user clicks OK)
             # Ensure the date directory exists
             date_dir = self.ensure_date_directory_exists(date)
             
             # Get the filename
-            filename = os.path.basename(source_path)
             destination_path = os.path.join(date_dir, filename)
             
             # Handle duplicate filenames
@@ -53,9 +90,9 @@ class FileManager:
             messagebox.showerror("Import Error", f"Failed to import file: {str(e)}")
             return None
     
-    def select_and_import_file(self, date: datetime = None) -> Optional[str]:
+    def select_and_import_file(self, date: datetime = None, parent_widget=None) -> Optional[str]:
         """
-        Open file dialog to select and import a file.
+        Open file dialog to select and import a file with text extraction.
         Returns the new file path if successful, None otherwise.
         """
         # Define supported file types
@@ -77,7 +114,7 @@ class FileManager:
             return None
         
         # Import the file
-        destination_path = self.import_file(source_path, date)
+        destination_path = self.import_file(source_path, date, parent_widget)
         
         if destination_path:
             messagebox.showinfo(

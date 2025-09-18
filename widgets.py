@@ -364,7 +364,7 @@ class ItemsDisplayWidget:
     
     def _import_bill(self):
         """Handle import bill button click."""
-        imported_path = self.file_manager.select_and_import_file()
+        imported_path = self.file_manager.select_and_import_file(parent_widget=self.parent)
         if imported_path:
             # Optionally, you could add logic here to create an item entry
             # based on the imported file
