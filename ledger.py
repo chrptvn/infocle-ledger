@@ -244,11 +244,11 @@ with right:
     show_totals = st.checkbox("Show totals", value=True)
 
 # Filter items
-items = st.session_state.items
+all_items = st.session_state.items
 if selected_acc != "All":
-    filtered_items = [it for it in items if it["account"] == selected_acc]
+    filtered_items = [it for it in all_items if it["account"] == selected_acc]
 else:
-    filtered_items = items
+    filtered_items = all_items
 
 # Display items
 if not filtered_items:
