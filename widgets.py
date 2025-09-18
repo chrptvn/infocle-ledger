@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk
 from typing import List, Callable, Optional
 from models import Item
+from file_manager import FileManager
+from datetime import datetime
 
 class AccountListWidget:
     """Widget for managing the list of accounts."""
@@ -193,6 +195,9 @@ class ItemsDisplayWidget:
         self.show_totals_var = None
         self.totals_frame = None
         
+        # File manager for importing bills
+        self.file_manager = FileManager()
+        
     def create(self) -> ttk.Frame:
         """Create and return the items display frame."""
         self.frame = ttk.LabelFrame(self.parent, text="Items", padding="10")
@@ -252,6 +257,9 @@ class ItemsDisplayWidget:
         )
         ttk.Button(btn_frame, text="Delete Item", command=self._delete_item).grid(
             row=0, column=1
+        )
+        ttk.Button(btn_frame, text="Import Bill", command=self._import_bill).grid(
+            row=0, column=2, padx=(5, 0)
         )
         
         # Totals frame
@@ -345,3 +353,11 @@ class ItemsDisplayWidget:
             # Create a dummy item - the main app will provide the real one
             dummy_item = Item(id=item_id, account="", description="", price=0.0)
             self.on_delete(dummy_item)
+    
+    def _import_bill(self):
+        """Handle import bill button click."""
+        imported_path = self.file_manager.select_and_import_file()
+        if imported_path:
+            # Optionally, you could add logic here to create an item entry
+            # based on the imported file
+            pass

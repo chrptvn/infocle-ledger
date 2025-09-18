@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from typing import List, Optional, Callable
 from models import Item
+from file_manager import FileManager
+import os
 
 class EditItemDialog:
     """Dialog for editing an existing item."""
@@ -13,6 +15,7 @@ class EditItemDialog:
         self.accounts = accounts
         self.on_save = on_save
         self.dialog = None
+        self.file_manager = FileManager()
         
     def show(self):
         """Display the edit dialog."""
@@ -69,6 +72,9 @@ class EditItemDialog:
         ttk.Button(btn_frame, text="Cancel", command=self.dialog.destroy).grid(
             row=0, column=1, padx=5
         )
+        ttk.Button(btn_frame, text="Import Bill", command=self._import_bill).grid(
+            row=0, column=2, padx=5
+        )
         
         self.dialog.columnconfigure(1, weight=1)
         desc_entry.focus()
@@ -99,6 +105,18 @@ class EditItemDialog:
         
         self.on_save(updated_item)
         self.dialog.destroy()
+    
+    def _import_bill(self):
+        """Import a bill file for this item."""
+        imported_path = self.file_manager.select_and_import_file()
+        if imported_path:
+            # Update the description to include reference to the imported file
+            filename = os.path.basename(imported_path)
+            current_desc = self.desc_var.get().strip()
+            if current_desc and not filename in current_desc:
+                self.desc_var.set(f"{current_desc} (Bill: {filename})")
+            elif not current_desc:
+                self.desc_var.set(f"Bill: {filename}")
 
 def ask_account_name(title: str, prompt: str, initial_value: str = "") -> Optional[str]:
     """Ask for an account name using a simple dialog."""
