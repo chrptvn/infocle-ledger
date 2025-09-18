@@ -246,10 +246,12 @@ with right:
 # Filter items
 items = st.session_state.items
 if selected_acc != "All":
-    items = [it for it in items if it["account"] == selected_acc]
+    filtered_items = [it for it in items if it["account"] == selected_acc]
+else:
+    filtered_items = items
 
 # Display items
-if not items:
+if not filtered_items:
     st.info("No items to show yet.")
 else:
     # Table header
@@ -260,7 +262,7 @@ else:
     hdr[3].markdown("**Account**")
     hdr[4].markdown("**Actions**")
 
-    for it in items:
+    for it in filtered_items:
         cols = st.columns([0.6, 2.8, 1, 1.2, 1.2])
         cols[0].text(it["id"])
 
