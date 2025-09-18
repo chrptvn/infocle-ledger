@@ -203,7 +203,7 @@ class ItemsDisplayWidget:
         
         ttk.Label(filter_frame, text="Filter by Account:").grid(row=0, column=0, padx=(0, 5))
         self.filter_var = tk.StringVar()
-        self.filter_combo = ttk.Combobox(self.filter_var, state="readonly")
+        self.filter_combo = ttk.Combobox(filter_frame, textvariable=self.filter_var, state="readonly")
         self.filter_combo.grid(row=0, column=1, padx=(0, 10))
         self.filter_combo.bind('<<ComboboxSelected>>', self._on_filter_change)
         
