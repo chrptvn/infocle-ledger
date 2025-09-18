@@ -1,9 +1,15 @@
+import os
 import sqlite3
 from typing import List, Dict, Any
 
 class DatabaseManager:
     def __init__(self, db_file: str = "ledger.db"):
-        self.db_file = db_file
+        # Create data directory if it doesn't exist
+        data_dir = os.path.join(os.path.dirname(__file__), "data")
+        os.makedirs(data_dir, exist_ok=True)
+        
+        # Set database file path in data directory
+        self.db_file = os.path.join(data_dir, db_file)
         self.init_database()
     
     def init_database(self):
