@@ -1,27 +1,144 @@
 
 import streamlit as st
+import sqlite3
+import os
 from typing import List, Dict, Any
 from itertools import count
 
 st.set_page_config(page_title="Simple Ledger", layout="wide")
 
+# Database setup
+DB_FILE = "ledger.db"
+
+def init_database():
+    """Initialize the SQLite database with required tables."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    # Create accounts table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    ''')
+    
+    # Create items table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account TEXT NOT NULL,
+            description TEXT NOT NULL,
+            price REAL NOT NULL,
+            FOREIGN KEY (account) REFERENCES accounts (name)
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+def load_accounts() -> List[str]:
+    """Load accounts from database."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM accounts ORDER BY name")
+    accounts = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return accounts
+
+def load_items() -> List[Dict[str, Any]]:
+    """Load items from database."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, account, description, price FROM items ORDER BY id")
+    items = []
+    for row in cursor.fetchall():
+        items.append({
+            "id": row[0],
+            "account": row[1],
+            "description": row[2],
+            "price": row[3]
+        })
+    conn.close()
+    return items
+
+def save_account(name: str):
+    """Save account to database."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO accounts (name) VALUES (?)", (name,))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        pass  # Account already exists
+    conn.close()
+
+def remove_account(name: str):
+    """Remove account and its items from database."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM items WHERE account = ?", (name,))
+    cursor.execute("DELETE FROM accounts WHERE name = ?", (name,))
+    conn.commit()
+    conn.close()
+
+def update_account_name(old_name: str, new_name: str):
+    """Update account name in database."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE accounts SET name = ? WHERE name = ?", (new_name, old_name))
+    cursor.execute("UPDATE items SET account = ? WHERE account = ?", (new_name, old_name))
+    conn.commit()
+    conn.close()
+
+def save_item(account: str, description: str, price: float) -> int:
+    """Save item to database and return its ID."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO items (account, description, price) VALUES (?, ?, ?)", 
+                   (account, description, price))
+    item_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return item_id
+
+def remove_item(item_id: int):
+    """Remove item from database."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM items WHERE id = ?", (item_id,))
+    conn.commit()
+    conn.close()
+
+def update_item(item_id: int, description: str, price: float, account: str):
+    """Update item in database."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE items SET description = ?, price = ?, account = ? WHERE id = ?", 
+                   (description, price, account, item_id))
+    conn.commit()
+    conn.close()
+
+# Initialize database
+init_database()
+
 # Initialize session state
 if "accounts" not in st.session_state:
-    st.session_state.accounts: List[str] = []
+    st.session_state.accounts: List[str] = load_accounts()
 if "items" not in st.session_state:
-    st.session_state.items: List[Dict[str, Any]] = []
-if "id_counter" not in st.session_state:
-    st.session_state.id_counter = count(1)
+    st.session_state.items: List[Dict[str, Any]] = load_items()
 
 def add_account(name: str):
     name = name.strip()
     if name and name not in st.session_state.accounts:
         st.session_state.accounts.append(name)
+        save_account(name)
 
 def delete_account(name: str):
     # Remove account and any items belonging to it
     st.session_state.accounts = [c for c in st.session_state.accounts if c != name]
     st.session_state.items = [it for it in st.session_state.items if it["account"] != name]
+    remove_account(name)
 
 def rename_account(old: str, new: str):
     new = new.strip()
@@ -32,6 +149,7 @@ def rename_account(old: str, new: str):
     for it in st.session_state.items:
         if it["account"] == old:
             it["account"] = new
+    update_account_name(old, new)
 
 def add_item(account: str, description: str, price: float):
     if not account or account not in st.session_state.accounts:
@@ -41,7 +159,7 @@ def add_item(account: str, description: str, price: float):
     if not description:
         st.warning("Description cannot be empty.")
         return
-    item_id = next(st.session_state.id_counter)
+    item_id = save_item(account, description, price)
     st.session_state.items.append({
         "id": item_id,
         "account": account,
@@ -51,6 +169,7 @@ def add_item(account: str, description: str, price: float):
 
 def delete_item(item_id: int):
     st.session_state.items = [it for it in st.session_state.items if it["id"] != item_id]
+    remove_item(item_id)
 
 def edit_item(item_id: int, new_desc: str, new_price: float, new_acc: str):
     for it in st.session_state.items:
@@ -59,11 +178,12 @@ def edit_item(item_id: int, new_desc: str, new_price: float, new_acc: str):
             it["price"] = float(new_price)
             it["account"] = new_acc
             break
+    update_item(item_id, new_desc.strip(), new_price, new_acc)
 
 def currency(v: float) -> str:
     return f"$ {v:,.2f}"
 
-st.title("Simple Ledger (no persistence)")
+st.title("Simple Ledger")
 
 # Sidebar: Account management
 st.sidebar.header("Accounts")
