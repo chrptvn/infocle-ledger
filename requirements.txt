@@ -9,26 +9,18 @@
 
 # Optional Dependencies for Enhanced Functionality
 
-# PDF Text Extraction
-PyPDF2>=3.0.0
-# Alternative PDF library (fallback)
-pdfplumber>=0.9.0
-
-# OpenAI API for image text extraction (no additional packages needed)
+# OpenAI API for text extraction (no additional packages needed)
 # Uses Python's built-in urllib and json modules
 
 # Installation Instructions:
 # 
-# For basic functionality (without text extraction):
+# For basic functionality (text files only):
 # No additional packages needed - uses only Python standard library
 #
-# For PDF text extraction:
-# pip install PyPDF2 pdfplumber
-#
-# For image text extraction:
+# For PDF and image text extraction:
 # No additional packages needed - uses OpenAI Vision API
 # You'll need to configure your OpenAI API key in the application
 # 
 # For full functionality:
-# pip install -r requirements.txt
+# Just configure your OpenAI API key - no pip installs needed!
 #

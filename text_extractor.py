@@ -37,7 +37,7 @@ class TextExtractor:
         
         try:
             if ext == '.pdf':
-                return self._extract_from_pdf(file_path)
+                return self._extract_from_pdf_with_openai(file_path)
             elif ext == '.txt':
                 return self._extract_from_txt(file_path)
             elif ext in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'}:
@@ -48,29 +48,71 @@ class TextExtractor:
             logger.error(f"Error extracting text from {file_path}: {str(e)}")
             return False, f"Error extracting text: {str(e)}"
     
-    def _extract_from_pdf(self, file_path: str) -> Tuple[bool, str]:
-        """Extract text from PDF file."""
+    def _extract_from_pdf_with_openai(self, file_path: str) -> Tuple[bool, str]:
+        """Extract text from PDF file using OpenAI API."""
         try:
-            import PyPDF2
-            with open(file_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
-                text = ""
-                for page in pdf_reader.pages:
-                    text += page.extract_text() + "\n"
-                return True, text.strip()
-        except ImportError:
-            # Fallback: Try with pdfplumber if PyPDF2 is not available
-            try:
-                import pdfplumber
-                with pdfplumber.open(file_path) as pdf:
-                    text = ""
-                    for page in pdf.pages:
-                        page_text = page.extract_text()
-                        if page_text:
-                            text += page_text + "\n"
-                    return True, text.strip()
-            except ImportError:
-                return False, "PDF extraction requires PyPDF2 or pdfplumber library. Please install with: pip install PyPDF2"
+            api_key = self.config.get_openai_api_key()
+            if not api_key:
+                return False, "OpenAI API key not configured. Please set your API key in the configuration."
+            
+            # Read and encode the PDF file
+            with open(file_path, 'rb') as pdf_file:
+                pdf_data = pdf_file.read()
+                base64_pdf = base64.b64encode(pdf_data).decode('utf-8')
+            
+            # Prepare the API request
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}'
+            }
+            
+            payload = {
+                "model": self.config.get_openai_model(),
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Please extract all text from this PDF document. Return only the text content, no additional commentary."
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:application/pdf;base64,{base64_pdf}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "max_tokens": 2000
+            }
+            
+            # Make the API request
+            request = urllib.request.Request(
+                'https://api.openai.com/v1/chat/completions',
+                data=json.dumps(payload).encode('utf-8'),
+                headers=headers
+            )
+            
+            with urllib.request.urlopen(request) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                
+                if 'choices' in result and len(result['choices']) > 0:
+                    extracted_text = result['choices'][0]['message']['content']
+                    return True, extracted_text.strip()
+                else:
+                    return False, "No text extracted from the API response"
+                    
+        except urllib.error.HTTPError as e:
+            error_msg = f"OpenAI API error: {e.code} - {e.reason}"
+            if e.code == 401:
+                error_msg = "Invalid OpenAI API key. Please check your configuration."
+            elif e.code == 429:
+                error_msg = "OpenAI API rate limit exceeded. Please try again later."
+            return False, error_msg
+        except Exception as e:
+            return False, f"Error extracting text from PDF: {str(e)}"
     
     def _extract_from_txt(self, file_path: str) -> Tuple[bool, str]:
         """Extract text from text file."""
