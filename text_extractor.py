@@ -31,14 +31,7 @@ class TextExtractor:
 
         _, ext = os.path.splitext(file_path.lower())
         try:
-            if ext == '.pdf':
-                return self._extract_from_pdf_with_openai(file_path)
-            elif ext == '.txt':
-                return self._extract_from_txt(file_path)
-            elif ext in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'}:
-                return self._extract_from_image_with_openai(file_path)
-            else:
-                return False, f"Unsupported file type: {ext}"
+            return self._extract_bill(file_path)
         except Exception as e:
             logger.error(f"Error extracting text from {file_path}: {str(e)}", exc_info=True)
             return False, f"Error extracting text: {str(e)}"
@@ -87,7 +80,7 @@ class TextExtractor:
         data = r.json()
         return data["output"][0]["content"][0]["text"]
 
-    def _extract_from_pdf_with_openai(self, file_path: str) -> Tuple[bool, str]:
+    def _extract_bill(self, file_path: str) -> Tuple[bool, str]:
         try:
             file_id = self._upload_file(file_path, purpose="user_data")
             text = self._ask_model_with_file(
@@ -98,26 +91,6 @@ class TextExtractor:
             return True, text.strip()
         except Exception as e:
             return False, f"Error extracting text from PDF: {str(e)}"
-
-    def _extract_from_image_with_openai(self, file_path: str) -> Tuple[bool, str]:
-        try:
-            file_id = self._upload_file(file_path, purpose="user_data")
-            text = self._ask_model_with_file(
-                file_id,
-                "Perform OCR on this image. Return only the recognized text.",
-                max_tokens=4000
-            )
-            return True, text.strip()
-        except Exception as e:
-            return False, f"Error extracting text from image: {str(e)}"
-
-    def _extract_from_txt(self, file_path: str) -> Tuple[bool, str]:
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return True, f.read().strip()
-        except UnicodeDecodeError:
-            with open(file_path, 'r', encoding='latin-1') as f:
-                return True, f.read().strip()
 
     def configure_api_key(self, parent_widget=None):
         """Show dialog to configure OpenAI API key."""

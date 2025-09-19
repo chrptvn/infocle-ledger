@@ -41,7 +41,7 @@ class FileManager:
             
             # Step 1: Extract text from the bill
             if self.text_extractor.can_extract(source_path):
-                success, extracted_text = self.text_extractor.extract_text(source_path)
+                success, extracted_text = self.text_extractor.extract_text(source_path, ["grocery", "utilities", "electronics"])
                 
                 if success and extracted_text:
                     # Step 2: Display popup with extracted text
