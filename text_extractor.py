@@ -2,7 +2,7 @@ import os
 import logging
 import json
 import requests
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from tkinter import messagebox
 from config import Config
 
@@ -24,14 +24,14 @@ class TextExtractor:
         _, ext = os.path.splitext(file_path.lower())
         return ext in self.supported_extensions
 
-    def extract_text(self, file_path: str) -> Tuple[bool, str]:
+    def extract_text(self, file_path: str, categories: List[str]) -> Tuple[bool, str]:
         """Extract text from a file. Returns (success, text)."""
         if not os.path.exists(file_path):
             return False, "File not found"
 
         _, ext = os.path.splitext(file_path.lower())
         try:
-            return self._extract_bill(file_path)
+            return self._extract_bill(file_path, categories)
         except Exception as e:
             logger.error(f"Error extracting text from {file_path}: {str(e)}", exc_info=True)
             return False, f"Error extracting text: {str(e)}"
@@ -80,12 +80,15 @@ class TextExtractor:
         data = r.json()
         return data["output"][0]["content"][0]["text"]
 
-    def _extract_bill(self, file_path: str) -> Tuple[bool, str]:
+    def _extract_bill(self, file_path: str, categories: List[str]) -> Tuple[bool, str]:
         try:
             file_id = self._upload_file(file_path, purpose="user_data")
+            prompt = "Extract all textual content from this PDF document in reading order. Return only the text, no commentary."
+            # If categories are provided, you can modify the prompt to focus on them.
+
             text = self._ask_model_with_file(
                 file_id,
-                "Extract all textual content from this PDF document in reading order. Return only the text, no commentary.",
+                prompt,
                 max_tokens=8000
             )
             return True, text.strip()
