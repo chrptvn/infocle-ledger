@@ -19,42 +19,6 @@ class TextExtractor:
     def __init__(self):
         self.supported_extensions = {'.pdf', '.txt', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'}
         self.config = Config()
-        self.prompt_file = os.path.join(os.path.dirname(__file__), "prompts", "bill_extraction.txt")
-    
-    def _load_prompt(self, categories: List[str]) -> str:
-        """Load the bill extraction prompt and replace categories placeholder."""
-        try:
-            with open(self.prompt_file, 'r', encoding='utf-8') as f:
-                prompt = f.read()
-            
-            # Replace the categories placeholder with the actual categories
-            categories_json = json.dumps(categories)
-            prompt = prompt.replace('["groceries","utilities","transportation","entertainment","healthcare","personal care","education","miscellaneous"]', categories_json)
-            
-            return prompt
-        except FileNotFoundError:
-            logger.error(f"Prompt file not found: {self.prompt_file}")
-            # Fallback prompt
-            return f"""Extract all items from this bill/receipt and categorize them.
-
-Categories: {categories}
-
-Return JSON format:
-{{
-  "bill_number": string|null,
-  "items": [
-    {{
-      "description": string,
-      "quantity": number|null,
-      "unit_price": number|null,
-      "price": number,
-      "category": string
-    }}
-  ]
-}}"""
-        except Exception as e:
-            logger.error(f"Error loading prompt: {e}")
-            return "Extract text from this document."
 
     def can_extract(self, file_path: str) -> bool:
         """Check if the file type is supported for text extraction."""
@@ -118,17 +82,81 @@ Return JSON format:
         return data["output"][0]["content"][0]["text"]
 
     def _extract_bill(self, file_path: str, categories: List[str]) -> Tuple[bool, str]:
+        """Extract and parse bill information using OpenAI API."""
+        api_key = self.config.get_openai_api_key()
+        if not api_key:
+            return False, "OpenAI API key not configured. Please configure it first."
+        
+        # Load the prompt with categories
+        prompt = self._load_prompt(categories)
+        
         try:
-            file_id = self._upload_file(file_path, purpose="user_data")
-            prompt = "Extract all textual content from this PDF document in reading order. Return only the text, no commentary."
-            # If categories are provided, you can modify the prompt to focus on them.
-
-            text = self._ask_model_with_file(
-                file_id,
-                prompt,
-                max_tokens=8000
+            import urllib.request
+            import urllib.parse
+            
+            # Read and encode the file
+            with open(file_path, 'rb') as f:
+                file_data = f.read()
+            
+            file_base64 = base64.b64encode(file_data).decode('utf-8')
+            
+            # Determine MIME type based on file extension
+            _, ext = os.path.splitext(file_path.lower())
+            mime_type_map = {
+                '.pdf': 'application/pdf',
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.bmp': 'image/bmp',
+                '.tiff': 'image/tiff'
+            }
+            mime_type = mime_type_map.get(ext, 'application/octet-stream')
+            
+            # Prepare the request
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            }
+            
+            # Create the payload for vision API
+            payload = {
+                "model": self.config.get_openai_model(),
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": prompt
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{file_base64}"
+                            }
+                        }
+                    ]
+                }],
+                "max_tokens": 4000
+            }
+            
+            # Make the API request
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(
+                'https://api.openai.com/v1/chat/completions',
+                data=data,
+                headers=headers
             )
-            return True, text.strip()
+            
+            with urllib.request.urlopen(req, timeout=300) as response:
+                result = json.loads(response.read().decode('utf-8'))
+            
+            if 'choices' in result and len(result['choices']) > 0:
+                extracted_text = result['choices'][0]['message']['content']
+                return True, extracted_text.strip()
+            else:
+                return False, "No response from OpenAI API"
+                
         except Exception as e:
             return False, f"Error extracting text from PDF: {str(e)}"
 
