@@ -1,6 +1,7 @@
 import os
 import logging
 import json
+import base64
 import requests
 from typing import Optional, Tuple, List
 from tkinter import messagebox
@@ -18,6 +19,42 @@ class TextExtractor:
     def __init__(self):
         self.supported_extensions = {'.pdf', '.txt', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'}
         self.config = Config()
+        self.prompt_file = os.path.join(os.path.dirname(__file__), "prompts", "bill_extraction.txt")
+    
+    def _load_prompt(self, categories: List[str]) -> str:
+        """Load the bill extraction prompt and replace categories placeholder."""
+        try:
+            with open(self.prompt_file, 'r', encoding='utf-8') as f:
+                prompt = f.read()
+            
+            # Replace the categories placeholder with the actual categories
+            categories_json = json.dumps(categories)
+            prompt = prompt.replace('["groceries","utilities","transportation","entertainment","healthcare","personal care","education","miscellaneous"]', categories_json)
+            
+            return prompt
+        except FileNotFoundError:
+            logger.error(f"Prompt file not found: {self.prompt_file}")
+            # Fallback prompt
+            return f"""Extract all items from this bill/receipt and categorize them.
+
+Categories: {categories}
+
+Return JSON format:
+{{
+  "bill_number": string|null,
+  "items": [
+    {{
+      "description": string,
+      "quantity": number|null,
+      "unit_price": number|null,
+      "price": number,
+      "category": string
+    }}
+  ]
+}}"""
+        except Exception as e:
+            logger.error(f"Error loading prompt: {e}")
+            return "Extract text from this document."
 
     def can_extract(self, file_path: str) -> bool:
         """Check if the file type is supported for text extraction."""
