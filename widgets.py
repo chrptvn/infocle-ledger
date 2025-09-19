@@ -269,6 +269,9 @@ class ItemsDisplayWidget:
         ttk.Button(btn_frame, text="Import Bill", command=self._import_bill).grid(
             row=0, column=2, padx=(5, 0)
         )
+        ttk.Button(btn_frame, text="Configure API", command=self._configure_api).grid(
+            row=0, column=3, padx=(5, 0)
+        )
         
         # Totals frame
         self.totals_frame = ttk.LabelFrame(self.frame, text="Totals", padding="10")
@@ -369,3 +372,9 @@ class ItemsDisplayWidget:
             # Optionally, you could add logic here to create an item entry
             # based on the imported file
             pass
+    
+    def _configure_api(self):
+        """Handle configure API button click."""
+        from text_extractor import TextExtractor
+        extractor = TextExtractor()
+        extractor.configure_api_key(self.parent)

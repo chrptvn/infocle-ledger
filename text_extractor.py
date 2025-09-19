@@ -1,7 +1,13 @@
 import os
 import logging
+import base64
+import json
+import urllib.request
+import urllib.parse
+import urllib.error
 from typing import Optional, Tuple
 from tkinter import messagebox
+from config import Config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -12,6 +18,7 @@ class TextExtractor:
     
     def __init__(self):
         self.supported_extensions = {'.pdf', '.txt', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'}
+        self.config = Config()
     
     def can_extract(self, file_path: str) -> bool:
         """Check if the file type is supported for text extraction."""
@@ -81,19 +88,92 @@ class TextExtractor:
                 return False, f"Error reading text file: {str(e)}"
     
     def _extract_from_image(self, file_path: str) -> Tuple[bool, str]:
-        """Extract text from image using OCR."""
+        """Extract text from image using OpenAI Vision API."""
         try:
-            import pytesseract
-            from PIL import Image
+            api_key = self.config.get_openai_api_key()
+            if not api_key:
+                return False, "OpenAI API key not configured. Please set your API key in the configuration."
             
-            # Open and process the image
-            image = Image.open(file_path)
-            text = pytesseract.image_to_string(image)
-            return True, text.strip()
-        except ImportError:
-            return False, "OCR extraction requires pytesseract and Pillow libraries. Please install with: pip install pytesseract Pillow"
+            # Read and encode the image
+            with open(file_path, 'rb') as image_file:
+                image_data = image_file.read()
+                base64_image = base64.b64encode(image_data).decode('utf-8')
+            
+            # Prepare the API request
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}'
+            }
+            
+            payload = {
+                "model": self.config.get_openai_model(),
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Please extract all text from this image. Return only the text content, no additional commentary."
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "max_tokens": 1000
+            }
+            
+            # Make the API request
+            request = urllib.request.Request(
+                'https://api.openai.com/v1/chat/completions',
+                data=json.dumps(payload).encode('utf-8'),
+                headers=headers
+            )
+            
+            with urllib.request.urlopen(request) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                
+                if 'choices' in result and len(result['choices']) > 0:
+                    extracted_text = result['choices'][0]['message']['content']
+                    return True, extracted_text.strip()
+                else:
+                    return False, "No text extracted from the API response"
+                    
+        except urllib.error.HTTPError as e:
+            error_msg = f"OpenAI API error: {e.code} - {e.reason}"
+            if e.code == 401:
+                error_msg = "Invalid OpenAI API key. Please check your configuration."
+            elif e.code == 429:
+                error_msg = "OpenAI API rate limit exceeded. Please try again later."
+            return False, error_msg
         except Exception as e:
             return False, f"Error extracting text from image: {str(e)}"
+    
+    def configure_api_key(self, parent_widget=None):
+        """Show dialog to configure OpenAI API key."""
+        from tkinter import simpledialog
+        
+        current_key = self.config.get_openai_api_key() or ""
+        masked_key = f"{'*' * (len(current_key) - 8)}{current_key[-8:]}" if len(current_key) > 8 else current_key
+        
+        prompt = f"Enter your OpenAI API key:\n(Current: {masked_key if current_key else 'Not set'})"
+        
+        new_key = simpledialog.askstring(
+            "Configure OpenAI API Key",
+            prompt,
+            show='*' if current_key else None
+        )
+        
+        if new_key and new_key.strip():
+            self.config.set_openai_api_key(new_key.strip())
+            if parent_widget:
+                messagebox.showinfo("Configuration", "OpenAI API key has been saved successfully!")
+            return True
+        return False
 
 def show_extracted_text_dialog(parent, extracted_text: str, filename: str) -> bool:
     """

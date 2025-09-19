@@ -14,9 +14,8 @@ PyPDF2>=3.0.0
 # Alternative PDF library (fallback)
 pdfplumber>=0.9.0
 
-# Image OCR (Optical Character Recognition)
-pytesseract>=0.3.10
-Pillow>=9.0.0
+# OpenAI API for image text extraction (no additional packages needed)
+# Uses Python's built-in urllib and json modules
 
 # Installation Instructions:
 # 
@@ -26,14 +25,10 @@ Pillow>=9.0.0
 # For PDF text extraction:
 # pip install PyPDF2 pdfplumber
 #
-# For image OCR text extraction:
-# pip install pytesseract Pillow
-# Note: pytesseract also requires Tesseract OCR engine to be installed on your system
+# For image text extraction:
+# No additional packages needed - uses OpenAI Vision API
+# You'll need to configure your OpenAI API key in the application
 # 
 # For full functionality:
 # pip install -r requirements.txt
 #
-# System Requirements for OCR:
-# - Windows: Download and install Tesseract from https://github.com/UB-Mannheim/tesseract/wiki
-# - macOS: brew install tesseract
-# - Linux: sudo apt-get install tesseract-ocr
