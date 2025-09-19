@@ -24,6 +24,46 @@ class TextExtractor:
         """Check if the file type is supported for text extraction."""
         _, ext = os.path.splitext(file_path.lower())
         return ext in self.supported_extensions
+    
+    def _load_prompt(self, categories: List[str]) -> str:
+        """Load the bill extraction prompt and inject categories."""
+        prompt_file = os.path.join("prompts", "bill_extraction.txt")
+        
+        try:
+            with open(prompt_file, 'r', encoding='utf-8') as f:
+                prompt_template = f.read()
+            
+            # Convert categories to JSON format for injection
+            categories_json = json.dumps(categories)
+            
+            # Replace placeholder with actual categories
+            prompt = prompt_template.replace('["groceries","utilities","transportation","entertainment","healthcare","personal care","education","miscellaneous"]', categories_json)
+            
+            return prompt
+            
+        except Exception as e:
+            logger.warning(f"Could not load prompt file {prompt_file}: {e}")
+            # Fallback prompt
+            categories_json = json.dumps(categories)
+            return f"""You are an expert at reading bills/invoices/receipts.
+
+Extract all purchased items from this document and categorize each item using only these categories: {categories_json}
+
+Return a JSON object with this structure:
+{{
+  "bill_number": string|null,
+  "items": [
+    {{
+      "description": string,
+      "quantity": number|null,
+      "unit_price": number|null,
+      "price": number,
+      "category": string
+    }}
+  ]
+}}
+
+Use only the provided categories. If unsure, use the most appropriate category from the list."""
 
     def extract_text(self, file_path: str, categories: List[str]) -> Tuple[bool, str]:
         """Extract text from a file. Returns (success, text)."""
